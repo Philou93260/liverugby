@@ -63,6 +63,40 @@ service cloud.firestore {
       allow read, write: if isOwner(userId);
     }
 
+    // Règles pour les tokens FCM (notifications push)
+    match /fcmTokens/{tokenId} {
+      // Lecture : Seulement le propriétaire du token
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Règles pour les abonnements aux matchs
+    match /matchSubscriptions/{subscriptionId} {
+      // Lecture : Seulement le propriétaire de l'abonnement
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Règles pour les matchs en direct (monitoring)
+    match /liveMatches/{matchId} {
+      // Lecture publique pour utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
+    // Règles pour les notifications envoyées (logs)
+    match /sentNotifications/{notificationId} {
+      // Lecture seulement via Cloud Functions (admin)
+      allow read: if false;
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
     // Règles pour les données temporaires (utilisées par cleanOldData)
     match /temporaryData/{docId} {
       allow read: if isAuthenticated();

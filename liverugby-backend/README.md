@@ -83,6 +83,25 @@ Les émulateurs seront disponibles sur :
 - `searchTeams` - Recherche des équipes par nom
 - `getMatchDetails` - Récupère les détails d'un match
 
+### 📱 Notifications Push (iOS/Android)
+- `registerFCMToken` - Enregistre un token FCM pour notifications push
+- `unregisterFCMToken` - Désactive/supprime un token FCM
+- `subscribeToMatch` - S'abonner aux notifications d'un match spécifique
+- `unsubscribeFromMatch` - Se désabonner d'un match
+- `addFavoriteTeam` - Ajouter une équipe aux favoris avec notifications
+- `monitorLiveMatches` - Monitoring des matchs en direct (exécution toutes les minutes)
+- `notifyFavoriteTeamsMatches` - Notifications matchs des équipes favorites (quotidien à 8h)
+
+**Types d'événements notifiés :**
+- 🏉 Match commence dans 30 minutes
+- 🏉 Match a commencé
+- 🎯 Score mis à jour
+- ⏸️ Mi-temps
+- 🏁 Match terminé
+- ⭐ Équipes favorites jouent aujourd'hui
+
+**📖 Guide complet iOS :** [IOS_PUSH_NOTIFICATIONS.md](./IOS_PUSH_NOTIFICATIONS.md)
+
 ### Tâches automatisées
 - `cleanOldData` - Nettoie les données temporaires (quotidien à 6h)
 - `updateMatchesDaily` - Met à jour les matchs (quotidien à 6h)
@@ -164,16 +183,20 @@ Créez `.runtimeconfig.json` dans le dossier `functions/` :
 
 ```
 liverugby-backend/
-├── .firebaserc              # Configuration du projet
-├── firebase.json            # Configuration Firebase
-├── firestore.rules          # Règles de sécurité Firestore
-├── firestore.indexes.json   # Index Firestore
-├── storage.rules            # Règles de sécurité Storage
-├── README.md               # Cette documentation
+├── .firebaserc                    # Configuration du projet
+├── firebase.json                  # Configuration Firebase
+├── firestore.rules                # Règles de sécurité Firestore
+├── firestore.indexes.json         # Index Firestore
+├── storage.rules                  # Règles de sécurité Storage
+├── README.md                      # Cette documentation
+├── CONFIG.md                      # Configuration API-Sports
+├── IOS_PUSH_NOTIFICATIONS.md      # Guide intégration iOS
+├── configure-api-key.sh           # Script configuration API
 └── functions/
-    ├── package.json        # Dépendances
-    ├── index.js            # Fonctions principales
-    └── rugby-api.js        # API Rugby
+    ├── package.json               # Dépendances
+    ├── index.js                   # Fonctions principales
+    ├── rugby-api.js               # API Rugby
+    └── push-notifications.js      # Notifications push temps réel
 ```
 
 ## 🗄️ Collections Firestore
@@ -188,13 +211,25 @@ Cache des matchs par date (YYYY-MM-DD)
 Cache des ligues et équipes
 
 ### `live-events/{eventId}`
-Événements en temps réel des matchs
+Événements en temps réel des matchs (webhook API-Sports)
+
+### `liveMatches/{matchId}`
+État actuel des matchs en direct (monitoring)
+
+### `fcmTokens/{tokenId}`
+Tokens FCM pour notifications push (iOS/Android)
+
+### `matchSubscriptions/{subscriptionId}`
+Abonnements utilisateurs aux notifications de matchs
+
+### `sentNotifications/{notificationId}`
+Logs des notifications envoyées (succès/échec)
 
 ### `temporaryData/{docId}`
 Données temporaires (nettoyées après 30 jours)
 
 ### `users/{userId}/favorites/{favoriteId}`
-Équipes favorites de l'utilisateur
+Équipes favorites de l'utilisateur avec notifications
 
 ## 🔥 Règles Storage
 

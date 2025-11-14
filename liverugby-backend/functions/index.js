@@ -6,6 +6,9 @@ admin.initializeApp();
 // Importer le module rugby-api
 const rugbyAPI = require('./rugby-api');
 
+// Importer le module push-notifications
+const pushNotifications = require('./push-notifications');
+
 // ============================================
 // FONCTION 1 : Créer un profil utilisateur lors de l'inscription
 // ============================================
@@ -139,3 +142,14 @@ exports.searchTeams = rugbyAPI.searchTeams;
 exports.getMatchDetails = rugbyAPI.getMatchDetails;
 exports.updateMatchesDaily = rugbyAPI.updateMatchesDaily;
 exports.rugbyWebhook = rugbyAPI.rugbyWebhook;
+
+// ============================================
+// EXPORTER LES FONCTIONS PUSH NOTIFICATIONS
+// ============================================
+exports.registerFCMToken = pushNotifications.registerFCMToken;
+exports.unregisterFCMToken = pushNotifications.unregisterFCMToken;
+exports.subscribeToMatch = pushNotifications.subscribeToMatch;
+exports.unsubscribeFromMatch = pushNotifications.unsubscribeFromMatch;
+exports.addFavoriteTeam = pushNotifications.addFavoriteTeam;
+exports.monitorLiveMatches = pushNotifications.monitorLiveMatches;
+exports.notifyFavoriteTeamsMatches = pushNotifications.notifyFavoriteTeamsMatches;
