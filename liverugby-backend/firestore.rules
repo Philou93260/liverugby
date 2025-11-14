@@ -1,0 +1,35 @@
+// Règles de sécurité Firestore
+// Copiez ce contenu dans la console Firebase > Firestore Database > Rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Règles pour les utilisateurs
+    match /users/{userId} {
+      // L'utilisateur peut lire et écrire ses propres données
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // Tout le monde peut lire les profils publics
+      allow read: if resource.data.isPublic == true;
+    }
+    
+    // Règles pour les collections génériques
+    match /collections/{collectionId} {
+      // Lecture publique, écriture authentifiée
+      allow read: if true;
+      allow create, update, delete: if request.auth != null;
+    }
+    
+    // Règles pour les données privées
+    match /private/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Règles pour les données publiques
+    match /public/{document=**} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}
