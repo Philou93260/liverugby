@@ -19,8 +19,8 @@ class RugbyService: ObservableObject {
     private let functions: Functions
     
     private init() {
-        // Utiliser us-central1 (région par défaut)
-        functions = Functions.functions(region: "us-central1")
+        // Utiliser europe-west1 (région configurée dans le backend Firebase)
+        functions = Functions.functions(region: "europe-west1")
     }
     
     // MARK: - Récupérer les matchs du jour
