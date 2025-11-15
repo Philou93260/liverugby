@@ -153,3 +153,9 @@ exports.unsubscribeFromMatch = pushNotifications.unsubscribeFromMatch;
 exports.addFavoriteTeam = pushNotifications.addFavoriteTeam;
 exports.monitorLiveMatches = pushNotifications.monitorLiveMatches;
 exports.notifyFavoriteTeamsMatches = pushNotifications.notifyFavoriteTeamsMatches;
+
+// ============================================
+// EXPORTER LES FONCTIONS LIVE ACTIVITIES (iOS)
+// ============================================
+exports.registerActivityPushToken = pushNotifications.registerActivityPushToken;
+exports.unregisterActivityPushToken = pushNotifications.unregisterActivityPushToken;

@@ -463,4 +463,28 @@ Avant de dire "C'est prêt !" :
 
 **Vous êtes maintenant prêt à recevoir des notifications push en temps réel ! 🎉**
 
+---
+
+## 🆕 Fonctionnalité Bonus : Live Activities (iOS 16.2+)
+
+Pour aller plus loin et afficher les scores des matchs **sur l'écran de verrouillage** et **la Dynamic Island**, consultez le guide dédié :
+
+📖 **[LIVE_ACTIVITIES_GUIDE.md](./LIVE_ACTIVITIES_GUIDE.md)**
+
+### Aperçu rapide
+
+Les **Live Activities** permettent :
+
+- 🔒 Affichage du score en temps réel sur l'écran de verrouillage
+- 🏝️ Intégration avec la Dynamic Island (iPhone 14 Pro+)
+- 🔔 Mises à jour automatiques via APNs push notifications
+- ⚡ Expérience utilisateur immersive sans ouvrir l'app
+
+**Prérequis :**
+- iOS 16.2+ (iPhone physique uniquement, pas de simulateur)
+- Backend déjà déployé avec les nouvelles fonctions Live Activities
+- APNs configuré
+
+---
+
 Pour toute question, consultez la documentation backend ou les logs Firebase.

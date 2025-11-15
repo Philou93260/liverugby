@@ -81,6 +81,15 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
 
+    // Règles pour les Activity Push Tokens (Live Activities iOS)
+    match /activityPushTokens/{tokenId} {
+      // Lecture : Seulement le propriétaire du token
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
     // Règles pour les matchs en direct (monitoring)
     match /liveMatches/{matchId} {
       // Lecture publique pour utilisateurs authentifiés

@@ -354,6 +354,41 @@ async function checkMatchForUpdates(match) {
       await sendMatchNotifications(matchId, event, updatedMatch);
     }
 
+    // Mettre à jour les Live Activities (si des utilisateurs en ont)
+    if (events.length > 0) {
+      const currentHomeScore = updatedMatch.scores?.home || 0;
+      const currentAwayScore = updatedMatch.scores?.away || 0;
+      const status = updatedMatch.status?.short || 'LIVE';
+      const elapsed = updatedMatch.status?.elapsed || null;
+
+      // Déterminer l'événement récent pour l'affichage
+      let recentEvent = null;
+      if (events.some(e => e.type === EVENT_TYPES.SCORE_UPDATE)) {
+        recentEvent = 'Essai marqué!';
+      } else if (events.some(e => e.type === EVENT_TYPES.MATCH_STARTED)) {
+        recentEvent = 'Match commencé';
+      } else if (events.some(e => e.type === EVENT_TYPES.HALFTIME)) {
+        recentEvent = 'Mi-temps';
+      }
+
+      // Envoyer mise à jour Live Activity
+      await sendLiveActivityUpdate(matchId, {
+        homeScore: currentHomeScore,
+        awayScore: currentAwayScore,
+        status: status,
+        elapsed: elapsed,
+        recentEvent: recentEvent
+      });
+
+      // Si le match est terminé, terminer la Live Activity
+      if (events.some(e => e.type === EVENT_TYPES.MATCH_ENDED)) {
+        await endLiveActivity(matchId, {
+          homeScore: currentHomeScore,
+          awayScore: currentAwayScore
+        });
+      }
+    }
+
   } catch (error) {
     console.error('Error checking match updates:', error);
   }
@@ -713,6 +748,262 @@ async function sendFavoriteTeamsNotification(token, matches) {
   }
 }
 
+// ============================================
+// FONCTION 8 : Enregistrer un Activity Push Token (Live Activity iOS)
+// ============================================
+exports.registerActivityPushToken = functions.https.onCall(async (data, context) => {
+  try {
+    // Vérifier l'authentification
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Vous devez être connecté');
+    }
+
+    const { matchId, token, platform } = data;
+    const userId = context.auth.uid;
+
+    // Valider les paramètres
+    if (!matchId || typeof matchId !== 'number') {
+      throw new functions.https.HttpsError('invalid-argument', 'Match ID invalide');
+    }
+
+    if (!token || typeof token !== 'string') {
+      throw new functions.https.HttpsError('invalid-argument', 'Activity Push Token invalide');
+    }
+
+    if (!platform || platform !== 'ios') {
+      throw new functions.https.HttpsError('invalid-argument', 'Les Live Activities sont disponibles uniquement sur iOS');
+    }
+
+    // Stocker le token dans Firestore
+    const activityTokenData = {
+      matchId: matchId,
+      token: token,
+      userId: userId,
+      platform: platform,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      active: true
+    };
+
+    // Utiliser un ID composite matchId_userId pour éviter les duplications
+    const docId = `${matchId}_${userId}`;
+
+    await admin.firestore()
+      .collection('activityPushTokens')
+      .doc(docId)
+      .set(activityTokenData, { merge: true });
+
+    console.log('Activity Push Token registered:', {
+      matchId,
+      userId,
+      token: token.substring(0, 20) + '...'
+    });
+
+    return {
+      success: true,
+      message: 'Activity Push Token enregistré avec succès'
+    };
+  } catch (error) {
+    console.error('Error registering Activity Push Token:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================
+// FONCTION 9 : Désactiver un Activity Push Token
+// ============================================
+exports.unregisterActivityPushToken = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Vous devez être connecté');
+    }
+
+    const { matchId } = data;
+    const userId = context.auth.uid;
+
+    if (!matchId) {
+      throw new functions.https.HttpsError('invalid-argument', 'Match ID requis');
+    }
+
+    const docId = `${matchId}_${userId}`;
+
+    // Marquer le token comme inactif au lieu de le supprimer
+    await admin.firestore()
+      .collection('activityPushTokens')
+      .doc(docId)
+      .update({
+        active: false,
+        deactivatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+    console.log('Activity Push Token unregistered:', { matchId, userId });
+
+    return {
+      success: true,
+      message: 'Activity Push Token désactivé'
+    };
+  } catch (error) {
+    console.error('Error unregistering Activity Push Token:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================
+// FONCTION 10 : Envoyer une mise à jour de Live Activity via APNs
+// ============================================
+async function sendLiveActivityUpdate(matchId, updateData) {
+  try {
+    // Récupérer tous les tokens actifs pour ce match
+    const tokensSnapshot = await admin.firestore()
+      .collection('activityPushTokens')
+      .where('matchId', '==', matchId)
+      .where('active', '==', true)
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log('No active Live Activity tokens for match:', matchId);
+      return;
+    }
+
+    const { homeScore, awayScore, status, elapsed, recentEvent } = updateData;
+
+    // Construire le payload APNs pour Live Activity
+    const apnsPayload = {
+      aps: {
+        timestamp: Math.floor(Date.now() / 1000),
+        event: 'update',
+        'content-state': {
+          homeScore: homeScore || 0,
+          awayScore: awayScore || 0,
+          status: status || 'LIVE',
+          elapsed: elapsed || null,
+          lastUpdate: new Date().toISOString(),
+          recentEvent: recentEvent || null
+        },
+        alert: recentEvent ? {
+          title: 'Match en direct',
+          body: `${homeScore} - ${awayScore}`,
+          sound: 'default'
+        } : undefined
+      }
+    };
+
+    // Envoyer la notification à chaque token
+    const sendPromises = [];
+    tokensSnapshot.forEach(doc => {
+      const tokenData = doc.data();
+      const message = {
+        apns: {
+          headers: {
+            'apns-push-type': 'liveactivity',
+            'apns-priority': '10'
+          },
+          payload: apnsPayload
+        },
+        token: tokenData.token
+      };
+
+      sendPromises.push(
+        admin.messaging().send(message)
+          .then(() => {
+            console.log('Live Activity update sent to token:', tokenData.token.substring(0, 20) + '...');
+          })
+          .catch(error => {
+            console.error('Error sending Live Activity update:', error);
+            // Si le token est invalide, le désactiver
+            if (error.code === 'messaging/invalid-registration-token' ||
+                error.code === 'messaging/registration-token-not-registered') {
+              return admin.firestore()
+                .collection('activityPushTokens')
+                .doc(doc.id)
+                .update({ active: false });
+            }
+          })
+      );
+    });
+
+    await Promise.all(sendPromises);
+    console.log(`Live Activity updates sent for match ${matchId} to ${sendPromises.length} devices`);
+
+  } catch (error) {
+    console.error('Error in sendLiveActivityUpdate:', error);
+  }
+}
+
+// ============================================
+// FONCTION 11 : Terminer une Live Activity
+// ============================================
+async function endLiveActivity(matchId, finalData) {
+  try {
+    // Récupérer tous les tokens actifs pour ce match
+    const tokensSnapshot = await admin.firestore()
+      .collection('activityPushTokens')
+      .where('matchId', '==', matchId)
+      .where('active', '==', true)
+      .get();
+
+    if (tokensSnapshot.empty) {
+      console.log('No active Live Activity tokens for match:', matchId);
+      return;
+    }
+
+    const { homeScore, awayScore } = finalData;
+
+    // Construire le payload APNs pour terminer la Live Activity
+    const apnsPayload = {
+      aps: {
+        timestamp: Math.floor(Date.now() / 1000),
+        event: 'end',
+        'content-state': {
+          homeScore: homeScore || 0,
+          awayScore: awayScore || 0,
+          status: 'FT',
+          elapsed: null,
+          lastUpdate: new Date().toISOString(),
+          recentEvent: 'Match terminé'
+        },
+        'dismissal-date': Math.floor((Date.now() + 3600000) / 1000) // Dismiss après 1h
+      }
+    };
+
+    // Envoyer la notification de fin à chaque token
+    const sendPromises = [];
+    tokensSnapshot.forEach(doc => {
+      const tokenData = doc.data();
+      const message = {
+        apns: {
+          headers: {
+            'apns-push-type': 'liveactivity',
+            'apns-priority': '10'
+          },
+          payload: apnsPayload
+        },
+        token: tokenData.token
+      };
+
+      sendPromises.push(
+        admin.messaging().send(message)
+          .then(() => {
+            console.log('Live Activity ended for token:', tokenData.token.substring(0, 20) + '...');
+            // Désactiver le token après la fin
+            return admin.firestore()
+              .collection('activityPushTokens')
+              .doc(doc.id)
+              .update({ active: false });
+          })
+          .catch(error => {
+            console.error('Error ending Live Activity:', error);
+          })
+      );
+    });
+
+    await Promise.all(sendPromises);
+    console.log(`Live Activity ended for match ${matchId}`);
+
+  } catch (error) {
+    console.error('Error in endLiveActivity:', error);
+  }
+}
+
 module.exports = {
   registerFCMToken: exports.registerFCMToken,
   unregisterFCMToken: exports.unregisterFCMToken,
@@ -720,5 +1011,9 @@ module.exports = {
   unsubscribeFromMatch: exports.unsubscribeFromMatch,
   addFavoriteTeam: exports.addFavoriteTeam,
   monitorLiveMatches: exports.monitorLiveMatches,
-  notifyFavoriteTeamsMatches: exports.notifyFavoriteTeamsMatches
+  notifyFavoriteTeamsMatches: exports.notifyFavoriteTeamsMatches,
+  registerActivityPushToken: exports.registerActivityPushToken,
+  unregisterActivityPushToken: exports.unregisterActivityPushToken,
+  sendLiveActivityUpdate: sendLiveActivityUpdate,
+  endLiveActivity: endLiveActivity
 };
