@@ -1,0 +1,23 @@
+# Firebase cache
+.firebase/
+
+# Functions config (NE JAMAIS COMMITTER)
+functions/.runtimeconfig.json
+
+# Logs
+*.log
+firebase-debug.log*
+firebase-debug.*.log*
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

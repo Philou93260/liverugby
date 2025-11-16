@@ -1,0 +1,107 @@
+# ============================================
+# SECRETS - NE JAMAIS COMMITTER ⚠️
+# ============================================
+GoogleService-Info.plist
+*.p8
+*.p12
+*.mobileprovision
+*.provisionprofile
+.env
+Config.plist
+Secrets.swift
+APIKeys.swift
+
+# ============================================
+# Xcode
+# ============================================
+# User-specific
+xcuserdata/
+*.xcworkspace/xcuserdata
+*.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+*.xcodeproj/xcuserdata
+*.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+
+# Build files
+DerivedData/
+build/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+!default.pbxuser
+!default.mode1v3
+!default.mode2v3
+!default.perspectivev3
+
+# ============================================
+# Swift Package Manager
+# ============================================
+.swiftpm/
+.build/
+Packages/
+Package.resolved
+*.xcodeproj
+
+# ============================================
+# CocoaPods (au cas où)
+# ============================================
+Pods/
+*.xcworkspace
+!default.xcworkspace
+Podfile.lock
+
+# ============================================
+# Fastlane
+# ============================================
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+fastlane/README.md
+
+# ============================================
+# Code Injection
+# ============================================
+iOSInjectionProject/
+
+# ============================================
+# Autres
+# ============================================
+.DS_Store
+*.swp
+*.swo
+*~
+.idea/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Playground
+*.playground
+timeline.xctimeline
+playground.xcworkspace
+
+# Swift Package Manager debug
+.build/
+
+# AppCode
+.idea/
+*.iml
+
+# ============================================
+# Backup files
+# ============================================
+*~.nib
+*.orig
+*.rej
+
+# ============================================
+# Firebase local emulator data
+# ============================================
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+ui-debug.log
+database-debug.log
+firestore-debug.log

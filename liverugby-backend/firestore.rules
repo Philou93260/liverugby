@@ -1,35 +1,132 @@
-// Règles de sécurité Firestore
-// Copiez ce contenu dans la console Firebase > Firestore Database > Rules
+// Règles de sécurité Firestore - LiveRugby Backend
+// Version améliorée avec sécurité renforcée
 
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // Fonction helper pour vérifier l'authentification
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Fonction helper pour vérifier le propriétaire
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Fonction helper pour valider les données utilisateur
+    function isValidUserData() {
+      return request.resource.data.keys().hasAll(['email', 'createdAt']) &&
+             request.resource.data.email is string &&
+             request.resource.data.email.size() > 0;
+    }
+
     // Règles pour les utilisateurs
     match /users/{userId} {
       // L'utilisateur peut lire et écrire ses propres données
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserData();
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
       // Tout le monde peut lire les profils publics
       allow read: if resource.data.isPublic == true;
     }
-    
-    // Règles pour les collections génériques
-    match /collections/{collectionId} {
-      // Lecture publique, écriture authentifiée
-      allow read: if true;
-      allow create, update, delete: if request.auth != null;
+
+    // Règles pour les matchs (cache API Rugby)
+    match /matches/{matchDate} {
+      // Lecture publique pour utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
     }
-    
+
+    // Règles pour les ligues
+    match /leagues/{leagueId} {
+      // Lecture publique pour utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
+    // Règles pour les événements live
+    match /live-events/{eventId} {
+      // Lecture publique pour utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
+    // Règles pour les favoris utilisateurs
+    match /users/{userId}/favorites/{favoriteId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Règles pour les tokens FCM (notifications push)
+    match /fcmTokens/{tokenId} {
+      // Lecture : Seulement le propriétaire du token
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Règles pour les abonnements aux matchs
+    match /matchSubscriptions/{subscriptionId} {
+      // Lecture : Seulement le propriétaire de l'abonnement
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Règles pour les Activity Push Tokens (Live Activities iOS)
+    match /activityPushTokens/{tokenId} {
+      // Lecture : Seulement le propriétaire du token
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      // Écriture : Seulement le propriétaire
+      allow create, update: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+    }
+
+    // Règles pour les matchs en direct (monitoring)
+    match /liveMatches/{matchId} {
+      // Lecture publique pour utilisateurs authentifiés
+      allow read: if isAuthenticated();
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
+    // Règles pour les notifications envoyées (logs)
+    match /sentNotifications/{notificationId} {
+      // Lecture seulement via Cloud Functions (admin)
+      allow read: if false;
+      // Écriture seulement via Cloud Functions
+      allow write: if false;
+    }
+
+    // Règles pour les données temporaires (utilisées par cleanOldData)
+    match /temporaryData/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+    }
+
     // Règles pour les données privées
     match /private/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isOwner(userId);
     }
-    
+
     // Règles pour les données publiques
     match /public/{document=**} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create, update: if isAuthenticated();
+      allow delete: if false; // Seulement via Cloud Functions
+    }
+
+    // Bloquer tout le reste par défaut
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

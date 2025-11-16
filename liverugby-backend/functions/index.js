@@ -6,6 +6,9 @@ admin.initializeApp();
 // Importer le module rugby-api
 const rugbyAPI = require('./rugby-api');
 
+// Importer le module push-notifications
+const pushNotifications = require('./push-notifications');
+
 // ============================================
 // FONCTION 1 : Créer un profil utilisateur lors de l'inscription
 // ============================================
@@ -70,19 +73,35 @@ exports.sendWelcomeEmail = functions.firestore
 // ============================================
 // FONCTION 4 : API endpoint exemple
 // ============================================
+// Configuration CORS sécurisée
+const ALLOWED_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  'https://liverugby-6f075.web.app',
+  'https://liverugby-6f075.firebaseapp.com'
+  // Ajoutez vos domaines de production ici
+];
+
 exports.api = functions.https.onRequest((req, res) => {
-  res.set('Access-Control-Allow-Origin', '*');
-  
+  const origin = req.headers.origin;
+
+  // Vérifier si l'origine est autorisée
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.set('Access-Control-Allow-Origin', origin);
+  }
+
   if (req.method === 'OPTIONS') {
     res.set('Access-Control-Allow-Methods', 'GET, POST');
-    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.set('Access-Control-Max-Age', '3600');
     res.status(204).send('');
     return;
   }
-  
-  res.json({ 
+
+  res.json({
     message: 'API Firebase fonctionnelle',
-    timestamp: Date.now()
+    timestamp: Date.now(),
+    version: '1.0.0'
   });
 });
 
@@ -123,3 +142,20 @@ exports.searchTeams = rugbyAPI.searchTeams;
 exports.getMatchDetails = rugbyAPI.getMatchDetails;
 exports.updateMatchesDaily = rugbyAPI.updateMatchesDaily;
 exports.rugbyWebhook = rugbyAPI.rugbyWebhook;
+
+// ============================================
+// EXPORTER LES FONCTIONS PUSH NOTIFICATIONS
+// ============================================
+exports.registerFCMToken = pushNotifications.registerFCMToken;
+exports.unregisterFCMToken = pushNotifications.unregisterFCMToken;
+exports.subscribeToMatch = pushNotifications.subscribeToMatch;
+exports.unsubscribeFromMatch = pushNotifications.unsubscribeFromMatch;
+exports.addFavoriteTeam = pushNotifications.addFavoriteTeam;
+exports.monitorLiveMatches = pushNotifications.monitorLiveMatches;
+exports.notifyFavoriteTeamsMatches = pushNotifications.notifyFavoriteTeamsMatches;
+
+// ============================================
+// EXPORTER LES FONCTIONS LIVE ACTIVITIES (iOS)
+// ============================================
+exports.registerActivityPushToken = pushNotifications.registerActivityPushToken;
+exports.unregisterActivityPushToken = pushNotifications.unregisterActivityPushToken;
