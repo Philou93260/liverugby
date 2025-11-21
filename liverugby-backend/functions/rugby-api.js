@@ -281,7 +281,147 @@ exports.updateMatchesDaily = functions.pubsub
   });
 
 // ============================================
-// FONCTION 8 : Webhook pour mises à jour en temps réel (optionnel)
+// FONCTION 8 : Polling intelligent des matchs en cours (toutes les 3 minutes)
+// ============================================
+exports.pollLiveMatches = functions.pubsub
+  .schedule('*/3 * * * *') // Toutes les 3 minutes
+  .timeZone('Europe/Paris')
+  .onRun(async (context) => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+
+      console.log(`[Polling] Vérification des matchs en cours - ${today}`);
+
+      // Récupérer les matchs du jour depuis l'API
+      const response = await rugbyAPI.get('/games', {
+        params: {
+          date: today,
+          timezone: 'Europe/Paris',
+          live: 'all' // Récupérer tous les matchs live
+        }
+      });
+
+      const liveMatches = response.data.response || [];
+
+      // Filtrer uniquement les matchs en cours
+      const activeMatches = liveMatches.filter(match => {
+        const status = match.status?.short;
+        return ['1H', '2H', 'LIVE', 'HT'].includes(status);
+      });
+
+      console.log(`[Polling] ${activeMatches.length} match(s) en cours`);
+
+      if (activeMatches.length === 0) {
+        console.log('[Polling] Aucun match en cours, pas de notification à envoyer');
+        return null;
+      }
+
+      // Traiter chaque match actif
+      for (const match of activeMatches) {
+        const matchId = match.id;
+        const matchDocRef = admin.firestore().collection('live-matches').doc(matchId.toString());
+
+        // Récupérer l'état précédent du match
+        const matchDoc = await matchDocRef.get();
+        const previousData = matchDoc.exists ? matchDoc.data() : null;
+
+        // Données actuelles du match
+        const currentStatus = match.status?.short;
+        const currentHomeScore = match.scores?.home || 0;
+        const currentAwayScore = match.scores?.away || 0;
+
+        let hasChanged = false;
+        let eventType = null;
+
+        if (!previousData) {
+          // Premier polling de ce match - match vient de commencer
+          hasChanged = true;
+          eventType = 'match_start';
+          console.log(`[Polling] Nouveau match détecté: ${match.teams?.home?.name} vs ${match.teams?.away?.name}`);
+        } else {
+          // Vérifier les changements
+          const previousStatus = previousData.status;
+          const previousHomeScore = previousData.homeScore || 0;
+          const previousAwayScore = previousData.awayScore || 0;
+
+          // Changement de statut (1H -> HT -> 2H)
+          if (currentStatus !== previousStatus) {
+            hasChanged = true;
+            eventType = 'status_change';
+            console.log(`[Polling] Changement de statut: ${previousStatus} -> ${currentStatus}`);
+          }
+
+          // Changement de score
+          if (currentHomeScore !== previousHomeScore || currentAwayScore !== previousAwayScore) {
+            hasChanged = true;
+            eventType = 'score_update';
+            console.log(`[Polling] Score changé: ${previousHomeScore}-${previousAwayScore} -> ${currentHomeScore}-${currentAwayScore}`);
+          }
+
+          // Match terminé
+          if (['FT', 'AET', 'PEN'].includes(currentStatus) && !['FT', 'AET', 'PEN'].includes(previousStatus)) {
+            hasChanged = true;
+            eventType = 'match_end';
+            console.log(`[Polling] Match terminé: ${match.teams?.home?.name} vs ${match.teams?.away?.name}`);
+          }
+        }
+
+        // Si changement détecté, créer un événement
+        if (hasChanged) {
+          await admin.firestore().collection('live-events').add({
+            event: {
+              ...match,
+              type: eventType,
+              fixture: { id: matchId }
+            },
+            receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+            processed: false,
+            source: 'polling'
+          });
+
+          console.log(`[Polling] Événement créé: ${eventType} pour match ${matchId}`);
+        }
+
+        // Mettre à jour l'état du match dans Firestore
+        await matchDocRef.set({
+          matchId,
+          status: currentStatus,
+          homeScore: currentHomeScore,
+          awayScore: currentAwayScore,
+          homeTeam: match.teams?.home?.name,
+          awayTeam: match.teams?.away?.name,
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          fullData: match
+        });
+      }
+
+      // Nettoyer les anciens matchs terminés (plus de 24h)
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const oldMatchesSnapshot = await admin.firestore()
+        .collection('live-matches')
+        .where('lastUpdated', '<', yesterday)
+        .get();
+
+      const batch = admin.firestore().batch();
+      oldMatchesSnapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+
+      console.log(`[Polling] ${oldMatchesSnapshot.size} ancien(s) match(s) nettoyé(s)`);
+      console.log('[Polling] Vérification terminée');
+
+      return null;
+    } catch (error) {
+      console.error('[Polling] Erreur:', error);
+      return null;
+    }
+  });
+
+// ============================================
+// FONCTION 9 : Webhook pour mises à jour en temps réel (optionnel)
 // ============================================
 exports.rugbyWebhook = functions.https.onRequest(async (req, res) => {
   try {
@@ -299,7 +439,8 @@ exports.rugbyWebhook = functions.https.onRequest(async (req, res) => {
     const eventDoc = await admin.firestore().collection('live-events').add({
       event: eventData,
       receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-      processed: false
+      processed: false,
+      source: 'webhook'
     });
 
     console.log(`Événement reçu et enregistré: ${eventDoc.id}`);

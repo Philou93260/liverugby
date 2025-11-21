@@ -465,4 +465,5 @@ exports.getLeagueStandings = rugbyAPI.getLeagueStandings;
 exports.searchTeams = rugbyAPI.searchTeams;
 exports.getMatchDetails = rugbyAPI.getMatchDetails;
 exports.updateMatchesDaily = rugbyAPI.updateMatchesDaily;
+exports.pollLiveMatches = rugbyAPI.pollLiveMatches;
 exports.rugbyWebhook = rugbyAPI.rugbyWebhook;
