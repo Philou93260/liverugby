@@ -293,10 +293,19 @@ exports.rugbyWebhook = functions.https.onRequest(async (req, res) => {
     const eventData = req.body;
 
     // Traiter l'événement (match commencé, but marqué, etc.)
-    await admin.firestore().collection('live-events').add({
+    // En l'ajoutant à Firestore, cela déclenche automatiquement
+    // le trigger onMatchUpdate qui envoie les notifications push
+    const eventDoc = await admin.firestore().collection('live-events').add({
       event: eventData,
-      receivedAt: admin.firestore.FieldValue.serverTimestamp()
+      receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+      processed: false
     });
+
+    console.log(`Événement reçu et enregistré: ${eventDoc.id}`);
+    console.log(`Type: ${eventData.type || 'unknown'}, Match: ${eventData.fixture?.id || 'unknown'}`);
+
+    // Marquer l'événement comme traité
+    await eventDoc.update({ processed: true });
 
     res.status(200).send('OK');
   } catch (error) {
