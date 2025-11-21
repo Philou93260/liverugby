@@ -382,14 +382,97 @@ exports.pollLiveMatches = functions.pubsub
           console.log(`[Polling] Événement créé: ${eventType} pour match ${matchId}`);
         }
 
-        // Mettre à jour l'état du match dans Firestore
+        // Logger les nouveaux événements intéressants
+        const currentEvents = match.events || [];
+        const previousEvents = previousData?.events || [];
+
+        if (currentEvents.length > previousEvents.length) {
+          const newEvents = currentEvents.slice(previousEvents.length);
+          newEvents.forEach(event => {
+            const eventLog = {
+              type: event.type,
+              team: event.team,
+              player: event.player?.name || 'Inconnu',
+              time: event.time,
+              detail: event.detail || ''
+            };
+
+            switch(event.type) {
+              case 'try':
+                console.log(`[Polling] ⭐ ESSAI marqué par ${eventLog.player} (${eventLog.team}) à ${eventLog.time}`);
+                break;
+              case 'yellowcard':
+                console.log(`[Polling] 🟨 CARTON JAUNE pour ${eventLog.player} (${eventLog.team}) à ${eventLog.time}`);
+                break;
+              case 'redcard':
+                console.log(`[Polling] 🟥 CARTON ROUGE pour ${eventLog.player} (${eventLog.team}) à ${eventLog.time}`);
+                break;
+              case 'penalty':
+                console.log(`[Polling] 🎯 PÉNALITÉ réussie par ${eventLog.player} (${eventLog.team}) à ${eventLog.time}`);
+                break;
+              case 'conversion':
+                console.log(`[Polling] ✅ TRANSFORMATION réussie par ${eventLog.player} (${eventLog.team}) à ${eventLog.time}`);
+                break;
+              default:
+                console.log(`[Polling] 📌 ${event.type} par ${eventLog.player} à ${eventLog.time}`);
+            }
+          });
+        }
+
+        // Mettre à jour l'état du match dans Firestore avec TOUTES les infos
         await matchDocRef.set({
           matchId,
           status: currentStatus,
           homeScore: currentHomeScore,
           awayScore: currentAwayScore,
-          homeTeam: match.teams?.home?.name,
-          awayTeam: match.teams?.away?.name,
+
+          // Informations des équipes avec logos
+          homeTeam: {
+            id: match.teams?.home?.id,
+            name: match.teams?.home?.name,
+            logo: match.teams?.home?.logo
+          },
+          awayTeam: {
+            id: match.teams?.away?.id,
+            name: match.teams?.away?.name,
+            logo: match.teams?.away?.logo
+          },
+
+          // Informations de la ligue
+          league: {
+            id: match.league?.id,
+            name: match.league?.name,
+            logo: match.league?.logo,
+            country: match.league?.country
+          },
+
+          // Temps du match
+          time: {
+            date: match.date,
+            timestamp: match.timestamp,
+            timer: match.status?.timer,
+            elapsed: match.status?.elapsed
+          },
+
+          // Événements du match (essais, cartons, pénalités)
+          events: match.events || [],
+
+          // Analyse des événements
+          eventsSummary: {
+            tries: (match.events || []).filter(e => e.type === 'try').length,
+            conversions: (match.events || []).filter(e => e.type === 'conversion').length,
+            penalties: (match.events || []).filter(e => e.type === 'penalty').length,
+            yellowCards: (match.events || []).filter(e => e.type === 'yellowcard').length,
+            redCards: (match.events || []).filter(e => e.type === 'redcard').length,
+            substitutions: (match.events || []).filter(e => e.type === 'substitution').length
+          },
+
+          // Stade
+          venue: match.venue || null,
+
+          // Statistiques
+          statistics: match.statistics || [],
+
           lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
           fullData: match
         });
@@ -421,7 +504,82 @@ exports.pollLiveMatches = functions.pubsub
   });
 
 // ============================================
-// FONCTION 9 : Webhook pour mises à jour en temps réel (optionnel)
+// FONCTION 9 : Récupérer les détails complets d'un match en cours
+// ============================================
+exports.getLiveMatchDetails = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Vous devez être connecté');
+    }
+
+    const { matchId } = data;
+    if (!matchId) {
+      throw new functions.https.HttpsError('invalid-argument', 'matchId requis');
+    }
+
+    // Récupérer depuis Firestore
+    const matchDoc = await admin.firestore()
+      .collection('live-matches')
+      .doc(matchId.toString())
+      .get();
+
+    if (!matchDoc.exists) {
+      throw new functions.https.HttpsError('not-found', 'Match non trouvé');
+    }
+
+    const matchData = matchDoc.data();
+
+    return {
+      success: true,
+      match: {
+        id: matchData.matchId,
+        status: matchData.status,
+
+        // Scores
+        homeScore: matchData.homeScore,
+        awayScore: matchData.awayScore,
+
+        // Équipes avec logos
+        homeTeam: matchData.homeTeam,
+        awayTeam: matchData.awayTeam,
+
+        // Ligue avec logo
+        league: matchData.league,
+
+        // Temps
+        time: matchData.time,
+
+        // Événements (essais, cartons, pénalités)
+        events: matchData.events || [],
+
+        // Résumé des événements
+        summary: matchData.eventsSummary || {
+          tries: 0,
+          conversions: 0,
+          penalties: 0,
+          yellowCards: 0,
+          redCards: 0,
+          substitutions: 0
+        },
+
+        // Stade
+        venue: matchData.venue,
+
+        // Statistiques
+        statistics: matchData.statistics || [],
+
+        lastUpdated: matchData.lastUpdated
+      }
+    };
+
+  } catch (error) {
+    console.error('Erreur getLiveMatchDetails:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
+// ============================================
+// FONCTION 10 : Webhook pour mises à jour en temps réel (optionnel)
 // ============================================
 exports.rugbyWebhook = functions.https.onRequest(async (req, res) => {
   try {
