@@ -1,9 +1,10 @@
-const functions = require('firebase-functions');
+const functionsBase = require('firebase-functions');
+const functions = functionsBase.region('europe-west1');
 const admin = require('firebase-admin');
 const axios = require('axios');
 
 // Récupérer la clé API depuis la config Firebase
-const API_KEY = functions.config().apisports?.key || process.env.API_SPORTS_KEY;
+const API_KEY = functionsBase.config().apisports?.key || process.env.API_SPORTS_KEY;
 const API_BASE_URL = 'https://v1.rugby.api-sports.io';
 
 // Configuration axios

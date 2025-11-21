@@ -1,5 +1,6 @@
 // Firebase Cloud Functions
-const functions = require('firebase-functions');
+const functionsBase = require('firebase-functions');
+const functions = functionsBase.region('europe-west1');
 const admin = require('firebase-admin');
 admin.initializeApp();
 
