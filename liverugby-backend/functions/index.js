@@ -10,6 +10,9 @@ const rugbyAPI = require('./rugby-api');
 // Importer les helpers de notifications
 const notificationHelpers = require('./notification-helpers');
 
+// Importer les fonctions de test
+const testAPI = require('./test-api');
+
 // ============================================
 // FONCTION 1 : Créer un profil utilisateur lors de l'inscription
 // ============================================
@@ -467,3 +470,9 @@ exports.getMatchDetails = rugbyAPI.getMatchDetails;
 exports.updateMatchesDaily = rugbyAPI.updateMatchesDaily;
 exports.pollLiveMatches = rugbyAPI.pollLiveMatches;
 exports.rugbyWebhook = rugbyAPI.rugbyWebhook;
+
+// ============================================
+// EXPORTER LES FONCTIONS DE TEST
+// ============================================
+exports.testRugbyAPI = testAPI.testRugbyAPI;
+exports.getMatchFullDetails = testAPI.getMatchFullDetails;
