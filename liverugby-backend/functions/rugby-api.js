@@ -321,14 +321,14 @@ exports.pollLiveMatches = functions.pubsub
         return status && !inactiveStatuses.includes(status);
       });
 
-      console.log(`[Polling] ${activeMatches.length} match(s) en cours`);
+      console.log(`[Polling] ${activeMatches.length} match(s) actifs (en cours ou à venir)`);
 
       if (activeMatches.length === 0) {
-        console.log('[Polling] Aucun match en cours, pas de notification à envoyer');
+        console.log('[Polling] Aucun match actif');
         return null;
       }
 
-      // Traiter chaque match actif
+      // Traiter chaque match actif (même ceux qui n'ont pas changé)
       for (const match of activeMatches) {
         const matchId = match.id;
         const matchDocRef = admin.firestore().collection('live-matches').doc(matchId.toString());
@@ -378,20 +378,26 @@ exports.pollLiveMatches = functions.pubsub
           }
         }
 
-        // Si changement détecté, créer un événement
+        // Si changement détecté, créer un événement dans live-events
         if (hasChanged) {
-          await admin.firestore().collection('live-events').add({
-            event: {
-              ...match,
-              type: eventType,
-              fixture: { id: matchId }
-            },
-            receivedAt: admin.firestore.FieldValue.serverTimestamp(),
-            processed: false,
-            source: 'polling'
-          });
+          try {
+            const eventDoc = await admin.firestore().collection('live-events').add({
+              event: {
+                ...match,
+                type: eventType,
+                fixture: { id: matchId }
+              },
+              receivedAt: admin.firestore.FieldValue.serverTimestamp(),
+              processed: false,
+              source: 'polling'
+            });
 
-          console.log(`[Polling] Événement créé: ${eventType} pour match ${matchId}`);
+            console.log(`[Polling] ✅ Événement créé dans live-events: ${eventType} pour match ${matchId} (ID: ${eventDoc.id})`);
+          } catch (error) {
+            console.error(`[Polling] ❌ Erreur création événement pour match ${matchId}:`, error);
+          }
+        } else {
+          console.log(`[Polling] ℹ️ Aucun changement détecté pour match ${matchId} - Statut: ${currentStatus}`);
         }
 
         // Logger les nouveaux événements intéressants
@@ -432,62 +438,69 @@ exports.pollLiveMatches = functions.pubsub
         }
 
         // Mettre à jour l'état du match dans Firestore avec TOUTES les infos
-        await matchDocRef.set({
-          matchId,
-          status: currentStatus,
-          homeScore: currentHomeScore,
-          awayScore: currentAwayScore,
+        // Ceci se fait TOUJOURS, même sans changement
+        try {
+          await matchDocRef.set({
+            matchId,
+            status: currentStatus,
+            homeScore: currentHomeScore,
+            awayScore: currentAwayScore,
 
-          // Informations des équipes avec logos
-          homeTeam: {
-            id: match.teams?.home?.id,
-            name: match.teams?.home?.name,
-            logo: match.teams?.home?.logo
-          },
-          awayTeam: {
-            id: match.teams?.away?.id,
-            name: match.teams?.away?.name,
-            logo: match.teams?.away?.logo
-          },
+            // Informations des équipes avec logos
+            homeTeam: {
+              id: match.teams?.home?.id,
+              name: match.teams?.home?.name,
+              logo: match.teams?.home?.logo
+            },
+            awayTeam: {
+              id: match.teams?.away?.id,
+              name: match.teams?.away?.name,
+              logo: match.teams?.away?.logo
+            },
 
-          // Informations de la ligue
-          league: {
-            id: match.league?.id,
-            name: match.league?.name,
-            logo: match.league?.logo,
-            country: match.league?.country
-          },
+            // Informations de la ligue
+            league: {
+              id: match.league?.id,
+              name: match.league?.name,
+              logo: match.league?.logo,
+              country: match.league?.country
+            },
 
-          // Temps du match
-          time: {
-            date: match.date,
-            timestamp: match.timestamp,
-            timer: match.status?.timer,
-            elapsed: match.status?.elapsed
-          },
+            // Temps du match
+            time: {
+              date: match.date,
+              timestamp: match.timestamp,
+              timer: match.status?.timer,
+              elapsed: match.status?.elapsed
+            },
 
-          // Événements du match (essais, cartons, pénalités)
-          events: match.events || [],
+            // Événements du match (essais, cartons, pénalités)
+            events: match.events || [],
 
-          // Analyse des événements
-          eventsSummary: {
-            tries: (match.events || []).filter(e => e.type === 'try').length,
-            conversions: (match.events || []).filter(e => e.type === 'conversion').length,
-            penalties: (match.events || []).filter(e => e.type === 'penalty').length,
-            yellowCards: (match.events || []).filter(e => e.type === 'yellowcard').length,
-            redCards: (match.events || []).filter(e => e.type === 'redcard').length,
-            substitutions: (match.events || []).filter(e => e.type === 'substitution').length
-          },
+            // Analyse des événements
+            eventsSummary: {
+              tries: (match.events || []).filter(e => e.type === 'try').length,
+              conversions: (match.events || []).filter(e => e.type === 'conversion').length,
+              penalties: (match.events || []).filter(e => e.type === 'penalty').length,
+              yellowCards: (match.events || []).filter(e => e.type === 'yellowcard').length,
+              redCards: (match.events || []).filter(e => e.type === 'redcard').length,
+              substitutions: (match.events || []).filter(e => e.type === 'substitution').length
+            },
 
-          // Stade
-          venue: match.venue || null,
+            // Stade
+            venue: match.venue || null,
 
-          // Statistiques
-          statistics: match.statistics || [],
+            // Statistiques
+            statistics: match.statistics || [],
 
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-          fullData: match
-        });
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+            fullData: match
+          });
+
+          console.log(`[Polling] 💾 Match ${matchId} stocké dans live-matches: ${match.teams?.home?.name} vs ${match.teams?.away?.name} (${currentStatus})`);
+        } catch (error) {
+          console.error(`[Polling] ❌ Erreur stockage match ${matchId} dans Firestore:`, error);
+        }
       }
 
       // Nettoyer les anciens matchs terminés (plus de 24h)
@@ -506,7 +519,7 @@ exports.pollLiveMatches = functions.pubsub
       await batch.commit();
 
       console.log(`[Polling] ${oldMatchesSnapshot.size} ancien(s) match(s) nettoyé(s)`);
-      console.log('[Polling] Vérification terminée');
+      console.log(`[Polling] ✅ Vérification terminée - ${activeMatches.length} match(s) traité(s)`);
 
       return null;
     } catch (error) {
