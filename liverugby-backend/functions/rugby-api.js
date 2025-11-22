@@ -442,36 +442,36 @@ exports.pollLiveMatches = functions.pubsub
         try {
           await matchDocRef.set({
             matchId,
-            status: currentStatus,
+            status: currentStatus || null,
             homeScore: currentHomeScore,
             awayScore: currentAwayScore,
 
             // Informations des équipes avec logos
             homeTeam: {
-              id: match.teams?.home?.id,
-              name: match.teams?.home?.name,
-              logo: match.teams?.home?.logo
+              id: match.teams?.home?.id || null,
+              name: match.teams?.home?.name || null,
+              logo: match.teams?.home?.logo || null
             },
             awayTeam: {
-              id: match.teams?.away?.id,
-              name: match.teams?.away?.name,
-              logo: match.teams?.away?.logo
+              id: match.teams?.away?.id || null,
+              name: match.teams?.away?.name || null,
+              logo: match.teams?.away?.logo || null
             },
 
             // Informations de la ligue
             league: {
-              id: match.league?.id,
-              name: match.league?.name,
-              logo: match.league?.logo,
-              country: match.league?.country
+              id: match.league?.id || null,
+              name: match.league?.name || null,
+              logo: match.league?.logo || null,
+              country: match.league?.country || null
             },
 
             // Temps du match
             time: {
-              date: match.date,
-              timestamp: match.timestamp,
-              timer: match.status?.timer,
-              elapsed: match.status?.elapsed
+              date: match.date || null,
+              timestamp: match.timestamp || null,
+              timer: match.status?.timer || null,
+              elapsed: match.status?.elapsed || null
             },
 
             // Événements du match (essais, cartons, pénalités)
