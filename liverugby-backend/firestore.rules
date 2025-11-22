@@ -27,8 +27,8 @@ service cloud.firestore {
     }
 
     // Règles pour les matchs en cours (polling)
-    match /live-matches/{matchId} {
-      allow read: if request.auth != null;
+    match /liveMatches/{matchId} {
+      allow read: if true; // Lecture publique pour l'app
       allow write: if false; // Seulement les fonctions Cloud peuvent écrire
     }
 

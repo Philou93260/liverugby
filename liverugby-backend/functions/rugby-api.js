@@ -331,7 +331,7 @@ exports.pollLiveMatches = functions.pubsub
       // Traiter chaque match actif (même ceux qui n'ont pas changé)
       for (const match of activeMatches) {
         const matchId = match.id;
-        const matchDocRef = admin.firestore().collection('live-matches').doc(matchId.toString());
+        const matchDocRef = admin.firestore().collection('liveMatches').doc(matchId.toString());
 
         // Récupérer l'état précédent du match
         const matchDoc = await matchDocRef.get();
@@ -497,7 +497,7 @@ exports.pollLiveMatches = functions.pubsub
             fullData: match
           });
 
-          console.log(`[Polling] 💾 Match ${matchId} stocké dans live-matches: ${match.teams?.home?.name} vs ${match.teams?.away?.name} (${currentStatus})`);
+          console.log(`[Polling] 💾 Match ${matchId} stocké dans liveMatches: ${match.teams?.home?.name} vs ${match.teams?.away?.name} (${currentStatus})`);
         } catch (error) {
           console.error(`[Polling] ❌ Erreur stockage match ${matchId} dans Firestore:`, error);
         }
@@ -508,7 +508,7 @@ exports.pollLiveMatches = functions.pubsub
       yesterday.setDate(yesterday.getDate() - 1);
 
       const oldMatchesSnapshot = await admin.firestore()
-        .collection('live-matches')
+        .collection('liveMatches')
         .where('lastUpdated', '<', yesterday)
         .get();
 
@@ -544,7 +544,7 @@ exports.getLiveMatchDetails = functions.https.onCall(async (data, context) => {
 
     // Récupérer depuis Firestore
     const matchDoc = await admin.firestore()
-      .collection('live-matches')
+      .collection('liveMatches')
       .doc(matchId.toString())
       .get();
 
