@@ -256,7 +256,7 @@ exports.cleanOldData = functions.pubsub
 // FONCTION 6 : Trigger pour détecter les changements de matchs
 // ============================================
 exports.onMatchUpdate = functions.firestore
-  .document('live-events/{eventId}')
+  .document('liveEvents/{eventId}')
   .onCreate(async (snap, context) => {
     try {
       const eventData = snap.data();

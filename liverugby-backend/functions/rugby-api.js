@@ -378,10 +378,10 @@ exports.pollLiveMatches = functions.pubsub
           }
         }
 
-        // Si changement détecté, créer un événement dans live-events
+        // Si changement détecté, créer un événement dans liveEvents
         if (hasChanged) {
           try {
-            const eventDoc = await admin.firestore().collection('live-events').add({
+            const eventDoc = await admin.firestore().collection('liveEvents').add({
               event: {
                 ...match,
                 type: eventType,
@@ -392,7 +392,7 @@ exports.pollLiveMatches = functions.pubsub
               source: 'polling'
             });
 
-            console.log(`[Polling] ✅ Événement créé dans live-events: ${eventType} pour match ${matchId} (ID: ${eventDoc.id})`);
+            console.log(`[Polling] ✅ Événement créé dans liveEvents: ${eventType} pour match ${matchId} (ID: ${eventDoc.id})`);
           } catch (error) {
             console.error(`[Polling] ❌ Erreur création événement pour match ${matchId}:`, error);
           }
@@ -619,7 +619,7 @@ exports.rugbyWebhook = functions.https.onRequest(async (req, res) => {
     // Traiter l'événement (match commencé, but marqué, etc.)
     // En l'ajoutant à Firestore, cela déclenche automatiquement
     // le trigger onMatchUpdate qui envoie les notifications push
-    const eventDoc = await admin.firestore().collection('live-events').add({
+    const eventDoc = await admin.firestore().collection('liveEvents').add({
       event: eventData,
       receivedAt: admin.firestore.FieldValue.serverTimestamp(),
       processed: false,

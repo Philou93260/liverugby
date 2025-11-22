@@ -21,8 +21,8 @@ service cloud.firestore {
     }
 
     // Règles pour les événements en direct (lecture publique, écriture par fonctions seulement)
-    match /live-events/{eventId} {
-      allow read: if request.auth != null;
+    match /liveEvents/{eventId} {
+      allow read: if true; // Lecture publique pour l'app
       allow write: if false; // Seulement les fonctions Cloud peuvent écrire
     }
 
