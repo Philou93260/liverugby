@@ -292,21 +292,33 @@ exports.pollLiveMatches = functions.pubsub
 
       console.log(`[Polling] Vérification des matchs en cours - ${today}`);
 
-      // Récupérer les matchs du jour depuis l'API
+      // Récupérer TOUS les matchs du jour depuis l'API
+      // Note: L'API Rugby ne supporte pas le paramètre 'live', on récupère tous les matchs du jour
       const response = await rugbyAPI.get('/games', {
         params: {
           date: today,
-          timezone: 'Europe/Paris',
-          live: 'all' // Récupérer tous les matchs live
+          timezone: 'Europe/Paris'
         }
       });
 
-      const liveMatches = response.data.response || [];
+      const allMatches = response.data.response || [];
 
-      // Filtrer uniquement les matchs en cours
-      const activeMatches = liveMatches.filter(match => {
+      console.log(`[Polling] ${allMatches.length} match(s) trouvé(s) aujourd'hui`);
+
+      // Logger tous les statuts pour debug
+      if (allMatches.length > 0) {
+        allMatches.forEach((match, index) => {
+          console.log(`[Polling] Match ${index + 1}: ${match.teams?.home?.name} vs ${match.teams?.away?.name} - Statut: ${match.status?.short || 'UNKNOWN'} (${match.status?.long || 'UNKNOWN'})`);
+        });
+      }
+
+      // Filtrer uniquement les matchs en cours ou à venir
+      // Statuts possibles: NS (Not Started), 1H (1st Half), HT (Half Time), 2H (2nd Half), FT (Full Time), etc.
+      const activeMatches = allMatches.filter(match => {
         const status = match.status?.short;
-        return ['1H', '2H', 'LIVE', 'HT'].includes(status);
+        // Inclure tous les statuts sauf terminés (FT, AET, PEN, CANC, PST, ABD, AWD, WO)
+        const inactiveStatuses = ['FT', 'AET', 'PEN', 'CANC', 'PST', 'ABD', 'AWD', 'WO'];
+        return status && !inactiveStatuses.includes(status);
       });
 
       console.log(`[Polling] ${activeMatches.length} match(s) en cours`);
