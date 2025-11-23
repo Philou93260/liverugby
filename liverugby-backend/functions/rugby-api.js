@@ -281,10 +281,10 @@ exports.updateMatchesDaily = functions.pubsub
   });
 
 // ============================================
-// FONCTION 8 : Polling intelligent des matchs en cours (toutes les 3 minutes)
+// FONCTION 8 : Polling intelligent des matchs en cours (toutes les 1 minute)
 // ============================================
 exports.pollLiveMatches = functions.pubsub
-  .schedule('*/3 * * * *') // Toutes les 3 minutes
+  .schedule('*/1 * * * *') // Toutes les 1 minute (latence réduite)
   .timeZone('Europe/Paris')
   .onRun(async (context) => {
     try {
