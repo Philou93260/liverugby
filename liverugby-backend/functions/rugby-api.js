@@ -168,16 +168,34 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('invalid-argument', 'leagueId requis');
     }
 
+    // Déterminer la saison en cours
+    // Pour Top 14 : saison 2024-2025 = "2024" dans l'API
+    let currentSeason = season;
+    if (!currentSeason) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1; // 1-12
+
+      // Si on est avant juillet, on est dans la saison précédente
+      // Exemple : En janvier 2025, on est en saison 2024-2025 = "2024"
+      currentSeason = (month < 7) ? year - 1 : year;
+    }
+
+    console.log(`[Standings] Récupération classement - League: ${leagueId}, Season: ${currentSeason}`);
+
     const response = await rugbyAPI.get('/standings', {
       params: {
         league: leagueId,
-        season: season || new Date().getFullYear()
+        season: currentSeason
       }
     });
 
+    console.log(`[Standings] ${response.data.response?.length || 0} équipe(s) récupérée(s)`);
+
     return {
       success: true,
-      standings: response.data.response
+      standings: response.data.response,
+      season: currentSeason
     };
   } catch (error) {
     console.error('Error fetching standings:', error);
