@@ -312,24 +312,49 @@ exports.pollLiveMatches = functions.pubsub
         });
       }
 
-      // Filtrer uniquement les matchs en cours ou à venir
-      // Statuts possibles: NS (Not Started), 1H (1st Half), HT (Half Time), 2H (2nd Half), FT (Full Time), etc.
+      // ============================================
+      // STRATÉGIE : Traiter les matchs actifs + matchs récemment terminés
+      // ============================================
+
+      // 1. Filtrer les matchs actifs (en cours ou à venir)
       const activeMatches = allMatches.filter(match => {
         const status = match.status?.short;
-        // Inclure tous les statuts sauf terminés (FT, AET, PEN, CANC, PST, ABD, AWD, WO)
         const inactiveStatuses = ['FT', 'AET', 'PEN', 'CANC', 'PST', 'ABD', 'AWD', 'WO'];
         return status && !inactiveStatuses.includes(status);
       });
 
-      console.log(`[Polling] ${activeMatches.length} match(s) actifs (en cours ou à venir)`);
+      // 2. Récupérer les matchs dans Firestore qui sont en cours mais peut-être terminés dans l'API
+      const firestoreActiveMatches = await admin.firestore()
+        .collection('liveMatches')
+        .where('status', 'in', ['NS', '1H', 'HT', '2H', 'ET', 'BT', 'PT'])
+        .get();
 
-      if (activeMatches.length === 0) {
-        console.log('[Polling] Aucun match actif');
+      // 3. Pour chaque match Firestore "en cours", vérifier s'il est terminé dans l'API
+      const matchesToUpdate = new Set(activeMatches.map(m => m.id));
+
+      firestoreActiveMatches.docs.forEach(doc => {
+        const firestoreMatchId = parseInt(doc.data().matchId);
+        // Chercher ce match dans l'API (même s'il est FT)
+        const apiMatch = allMatches.find(m => m.id === firestoreMatchId);
+        if (apiMatch) {
+          matchesToUpdate.add(apiMatch.id);
+        }
+      });
+
+      // Convertir le Set en array de matchs complets
+      const matchesToProcess = allMatches.filter(m => matchesToUpdate.has(m.id));
+
+      console.log(`[Polling] ${activeMatches.length} match(s) actifs dans l'API`);
+      console.log(`[Polling] ${firestoreActiveMatches.size} match(s) actifs dans Firestore`);
+      console.log(`[Polling] ${matchesToProcess.length} match(s) à traiter au total`);
+
+      if (matchesToProcess.length === 0) {
+        console.log('[Polling] Aucun match à traiter');
         return null;
       }
 
-      // Traiter chaque match actif (même ceux qui n'ont pas changé)
-      for (const match of activeMatches) {
+      // Traiter chaque match (actifs + récemment terminés)
+      for (const match of matchesToProcess) {
         const matchId = match.id;
         const matchDocRef = admin.firestore().collection('liveMatches').doc(matchId.toString());
 
