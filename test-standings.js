@@ -23,12 +23,12 @@ axios.get(`${API_BASE_URL}/standings`, {
 .then(response => {
   const data = response.data;
 
-  console.log('📊 Résultat de l\'API:\n');
+  console.log('📊 Résultat de l\'API (saison 2025):\n');
   console.log(`   Résultats: ${data.results}`);
 
-  if (data.results === 0) {
-    console.log('❌ Aucun classement trouvé');
-    console.log('\nEssayons avec season: 2024...');
+  if (data.results === 0 || (data.response && data.response.length === 1 && !data.response[0].team?.name)) {
+    console.log('❌ Classement vide ou incomplet pour 2025');
+    console.log('\n🔄 Essayons avec season: 2024...\n');
 
     return axios.get(`${API_BASE_URL}/standings`, {
       params: {
@@ -55,16 +55,38 @@ axios.get(`${API_BASE_URL}/standings`, {
   console.log('\n🏉 Classement Top 14:');
   console.log('─'.repeat(80));
 
+  // Logger la structure du premier élément pour debug
+  if (standings.length > 0) {
+    console.log('\n📋 Structure du premier élément:');
+    console.log(JSON.stringify(standings[0], null, 2));
+    console.log('\n─'.repeat(80));
+  }
+
   standings.forEach((standing, index) => {
     const team = standing.team;
     const stats = standing;
 
-    console.log(`${index + 1}. ${team?.name || 'Unknown'}`);
-    console.log(`   Points: ${stats.points || 0} | J: ${stats.games?.played || 0} | V: ${stats.games?.win || 0} | N: ${stats.games?.draw || 0} | D: ${stats.games?.lose || 0}`);
+    // Logger toutes les clés disponibles
+    if (index === 0) {
+      console.log('\n🔑 Clés disponibles:', Object.keys(standing).join(', '));
+      console.log('─'.repeat(80) + '\n');
+    }
+
+    const position = standing.position || index + 1;
+    const teamName = team?.name || 'Unknown';
+    const points = standing.points || stats.all?.points || 0;
+    const played = stats.games?.played || stats.all?.played || 0;
+    const win = stats.games?.win || stats.all?.win || 0;
+    const draw = stats.games?.draw || stats.all?.draw || 0;
+    const lose = stats.games?.lose || stats.all?.lose || 0;
+
+    console.log(`${position}. ${teamName}`);
+    console.log(`   Points: ${points} | J: ${played} | V: ${win} | N: ${draw} | D: ${lose}`);
   });
 
   console.log('\n✅ Classement récupéré avec succès');
   console.log(`   Total équipes: ${standings.length}`);
+  console.log(`   Saison: ${result.data?.parameters?.season || 'inconnue'}`);
 })
 .catch(error => {
   console.error('❌ Erreur:', error.response?.data || error.message);
