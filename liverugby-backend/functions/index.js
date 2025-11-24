@@ -486,3 +486,9 @@ exports.getMatchFullDetails = testAPI.getMatchFullDetails;
 // ============================================
 exports.debugMatchStructure = debugAPI.debugMatchStructure;
 exports.debugTodayMatches = debugAPI.debugTodayMatches;
+
+// ============================================
+// EXPORTER LA FONCTION DE MISE À JOUR FORCÉE
+// ============================================
+const forceUpdateAPI = require('./force-update-match');
+exports.forceUpdateMatch = forceUpdateAPI.forceUpdateMatch;
