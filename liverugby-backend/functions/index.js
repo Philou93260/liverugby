@@ -4,8 +4,11 @@ const functions = functionsBase.region('us-central1');
 const admin = require('firebase-admin');
 admin.initializeApp();
 
-// Importer le module rugby-api
-const rugbyAPI = require('./rugby-api');
+// Importer le module SportRadar (nouveau)
+const sportradarAPI = require('./sportradar-api');
+
+// Ancien module API-Sports Rugby (gardé pour référence, peut être supprimé)
+// const rugbyAPI = require('./rugby-api');
 
 // Importer les helpers de notifications
 const notificationHelpers = require('./notification-helpers');
@@ -461,19 +464,19 @@ exports.sendDailyDigest = functions.pubsub
   });
 
 // ============================================
-// EXPORTER LES FONCTIONS RUGBY
+// EXPORTER LES FONCTIONS RUGBY (SPORTRADAR)
 // ============================================
-exports.getTodayMatches = rugbyAPI.getTodayMatches;
-exports.getLeagueMatches = rugbyAPI.getLeagueMatches;
-exports.getTeamMatches = rugbyAPI.getTeamMatches;
-exports.getLeagueTeams = rugbyAPI.getLeagueTeams;
-exports.getLeagueStandings = rugbyAPI.getLeagueStandings;
-exports.searchTeams = rugbyAPI.searchTeams;
-exports.getMatchDetails = rugbyAPI.getMatchDetails;
-exports.getLiveMatchDetails = rugbyAPI.getLiveMatchDetails;
-exports.updateMatchesDaily = rugbyAPI.updateMatchesDaily;
-exports.pollLiveMatches = rugbyAPI.pollLiveMatches;
-exports.rugbyWebhook = rugbyAPI.rugbyWebhook;
+exports.getTodayMatches = sportradarAPI.getTodayMatches;
+exports.getLeagueMatches = sportradarAPI.getLeagueMatches;
+exports.getTeamMatches = sportradarAPI.getTeamMatches;
+exports.getLeagueTeams = sportradarAPI.getLeagueTeams;
+exports.getLeagueStandings = sportradarAPI.getLeagueStandings;
+exports.searchTeams = sportradarAPI.searchTeams;
+exports.getMatchDetails = sportradarAPI.getMatchDetails;
+exports.getLiveMatchDetails = sportradarAPI.getLiveMatchDetails;
+exports.updateMatchesDaily = sportradarAPI.updateMatchesDaily;
+exports.pollLiveMatches = sportradarAPI.pollLiveMatches;
+exports.sportradarWebhook = sportradarAPI.sportradarWebhook;
 
 // ============================================
 // EXPORTER LES FONCTIONS DE TEST
