@@ -190,17 +190,19 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
       }
     });
 
-    // L'API retourne response: [[...]] (tableau de tableaux)
-    // On doit prendre le premier élément
-    const standings = response.data.response && response.data.response.length > 0
-      ? response.data.response[0]  // ← Prendre le premier tableau
-      : [];
+    // Gérer le cas où l'API peut retourner un tableau simple ou un tableau de tableaux
+    let standings = response.data.response || [];
+
+    // Si c'est un tableau de tableaux, prendre le premier élément
+    if (standings.length > 0 && Array.isArray(standings[0])) {
+      standings = standings[0];
+    }
 
     console.log(`[Standings] ${standings.length} équipe(s) récupérée(s)`);
 
     return {
       success: true,
-      standings: standings,  // ← Retourner le tableau plat
+      standings: standings,
       season: currentSeason
     };
   } catch (error) {
