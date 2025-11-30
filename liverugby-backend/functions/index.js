@@ -492,3 +492,12 @@ exports.debugTodayMatches = debugAPI.debugTodayMatches;
 // ============================================
 const forceUpdateAPI = require('./force-update-match');
 exports.forceUpdateMatch = forceUpdateAPI.forceUpdateMatch;
+
+// ============================================
+// EXPORTER LES FONCTIONS DE TEST SPORTRADAR
+// ============================================
+const sportradarTest = require('./sportradar-test');
+exports.testSportradarMatches = sportradarTest.testSportradarMatches;
+exports.testSportradarStandings = sportradarTest.testSportradarStandings;
+exports.testWebhookSimulation = sportradarTest.testWebhookSimulation;
+exports.checkAPIUsage = sportradarTest.checkAPIUsage;
