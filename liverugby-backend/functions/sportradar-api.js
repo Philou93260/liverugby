@@ -306,10 +306,13 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
 
     // Mapper leagueId vers competition_id Sportradar
     const competitionId = mapLeagueIdToSportradar(leagueId);
-    const seasonYear = season || new Date().getFullYear();
+
+    // Pour Sportradar, on utilise l'ID de saison directement
+    // Note: Standings en PARTIAL coverage - les données peuvent être limitées
+    const seasonId = getCurrentSeason(); // sr:season:132054 pour 2024-2025
 
     const response = await sportradarAPI.get(
-      `/competitions/${competitionId}/seasons/${seasonYear}/standings.json`
+      `/seasons/${seasonId}/standings.json`
     );
 
     const standings = response.data.standings || [];
@@ -398,12 +401,19 @@ exports.pollLiveMatches = functions.pubsub
 function mapLeagueIdToSportradar(apiSportsLeagueId) {
   // Mapper les IDs API-Sports vers Sportradar
   const mapping = {
-    16: 'sr:competition:123456', // Top 14 (à ajuster avec le vrai ID Sportradar)
-    17: 'sr:competition:234567', // Pro D2 (à ajuster)
-    // TODO: Ajouter les autres ligues quand on aura les IDs Sportradar
+    16: 'sr:competition:420', // Top 14 - CONFIRMÉ
+    // 17: 'sr:competition:XXX', // Pro D2 - À déterminer
+    // Ajouter les autres ligues au fur et à mesure
   };
 
   return mapping[apiSportsLeagueId] || apiSportsLeagueId;
+}
+
+function getCurrentSeason() {
+  // Pour le Top 14 saison 2024-2025
+  // Sportradar utilise sr:season:132054
+  // À adapter selon les saisons futures
+  return 'sr:season:132054';
 }
 
 // Export pour utilisation dans index.js
