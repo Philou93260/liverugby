@@ -501,3 +501,9 @@ exports.testSportradarMatches = sportradarTest.testSportradarMatches;
 exports.testSportradarStandings = sportradarTest.testSportradarStandings;
 exports.testWebhookSimulation = sportradarTest.testWebhookSimulation;
 exports.checkAPIUsage = sportradarTest.checkAPIUsage;
+
+// Note: Les fonctions Sportradar ne sont pas exportées ici car elles ne sont pas
+// encore activées en production. On continue d'utiliser rugby-api.js (API-Sports).
+// Pour activer Sportradar, décommenter ces lignes après les tests :
+// const sportradarAPI = require('./sportradar-api');
+// exports.refreshStandings = sportradarAPI.refreshStandings;

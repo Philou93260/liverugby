@@ -192,6 +192,23 @@ async function handleMatchEnded(match) {
     processed: false,
     source: 'webhook'
   });
+
+  // ============================================
+  // NOUVEAU : Invalider le cache du classement !
+  // ============================================
+  // Si c'est un match du Top 14, le classement a changé
+  if (match.competition?.id === 'sr:competition:420') {
+    console.log('[Webhook] Match Top 14 terminé → Invalidation du cache du classement');
+
+    // Supprimer le cache du classement pour forcer une mise à jour
+    const cacheKey = `standings_16_current`; // 16 = Top 14 dans l'app
+    await admin.firestore()
+      .collection('standingsCache')
+      .doc(cacheKey)
+      .delete();
+
+    console.log('[Webhook] Cache classement invalidé → Prochaine requête = classement frais');
+  }
 }
 
 async function handlePeriodChange(match) {
@@ -280,7 +297,8 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
       throw new functions.https.HttpsError('invalid-argument', 'leagueId requis');
     }
 
-    // OPTIMISATION: Cache avec TTL de 24h (le classement change rarement)
+    // OPTIMISATION: Cache avec invalidation automatique à la fin des matchs
+    // Le cache n'a pas de TTL fixe, il est invalidé quand un match se termine
     const cacheKey = `standings_${leagueId}_${season || 'current'}`;
     const cachedDoc = await admin.firestore()
       .collection('standingsCache')
@@ -288,17 +306,15 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
       .get();
 
     if (cachedDoc.exists) {
-      const cacheAge = Date.now() - cachedDoc.data().updatedAt.toMillis();
-      // Cache valide pendant 24 heures
-      if (cacheAge < 24 * 60 * 60 * 1000) {
-        console.log('[Sportradar] Classement depuis cache (0 requête API)');
-        return {
-          success: true,
-          standings: cachedDoc.data().standings,
-          season: cachedDoc.data().season,
-          fromCache: true
-        };
-      }
+      const cacheData = cachedDoc.data();
+      console.log('[Sportradar] Classement depuis cache (invalidé auto à fin de match, 0 requête API)');
+      return {
+        success: true,
+        standings: cacheData.standings,
+        season: cacheData.season,
+        fromCache: true,
+        lastUpdate: cacheData.updatedAt
+      };
     }
 
     // Appel API
@@ -327,8 +343,9 @@ exports.getLeagueStandings = functions.https.onCall(async (data, context) => {
     return {
       success: true,
       standings: standings,
-      season: seasonYear,
-      fromCache: false
+      season: seasonId,
+      fromCache: false,
+      message: 'Cache sera invalidé automatiquement à la fin des matchs Top 14'
     };
   } catch (error) {
     console.error('[Sportradar] Error fetching standings:', error);
@@ -376,13 +393,27 @@ exports.pollLiveMatches = functions.pubsub
 
       for (const doc of liveMatchesSnapshot.docs) {
         const matchId = doc.data().matchId;
+        const previousStatus = doc.data().status;
 
         // Appel API pour ce match
         await trackAPICall('match_summary');
         const response = await sportradarAPI.get(`/matches/${matchId}/summary.json`);
 
-        // Traiter la réponse (même logique que webhook)
-        await handleScoreChange(response.data);
+        const matchData = response.data;
+        const currentStatus = matchData.status;
+
+        // Détecter si le match vient de se terminer
+        const wasLive = ['1H', '2H', 'HT', 'ET'].includes(previousStatus);
+        const isFinished = ['FT', 'AET', 'PEN'].includes(currentStatus);
+
+        if (wasLive && isFinished) {
+          // Le match vient de se terminer
+          console.log(`[Polling] Match ${matchId} terminé`);
+          await handleMatchEnded(matchData);
+        } else {
+          // Simple mise à jour de score
+          await handleScoreChange(matchData);
+        }
 
         // Attendre 1s entre chaque requête pour ne pas surcharger
         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -416,10 +447,52 @@ function getCurrentSeason() {
   return 'sr:season:132054';
 }
 
+// ============================================
+// FONCTION UTILITAIRE : Rafraîchir le classement manuellement
+// ============================================
+exports.refreshStandings = functions.https.onCall(async (data, context) => {
+  try {
+    if (!context.auth) {
+      throw new functions.https.HttpsError('unauthenticated', 'Vous devez être connecté');
+    }
+
+    const { leagueId } = data;
+    if (!leagueId) {
+      throw new functions.https.HttpsError('invalid-argument', 'leagueId requis');
+    }
+
+    console.log(`[Sportradar] Rafraîchissement manuel du classement - League ${leagueId}`);
+
+    // Supprimer le cache
+    const cacheKey = `standings_${leagueId}_current`;
+    await admin.firestore()
+      .collection('standingsCache')
+      .doc(cacheKey)
+      .delete();
+
+    console.log('[Sportradar] Cache invalidé');
+
+    // Récupérer le nouveau classement
+    const result = await exports.getLeagueStandings.run({ leagueId }, { auth: context.auth });
+
+    return {
+      success: true,
+      message: 'Classement rafraîchi avec succès',
+      standings: result.standings,
+      requestsUsed: 1
+    };
+
+  } catch (error) {
+    console.error('[Sportradar] Erreur refresh:', error);
+    throw new functions.https.HttpsError('internal', error.message);
+  }
+});
+
 // Export pour utilisation dans index.js
 module.exports = {
   getTodayMatches: exports.getTodayMatches,
   getLeagueStandings: exports.getLeagueStandings,
+  refreshStandings: exports.refreshStandings,
   pollLiveMatches: exports.pollLiveMatches,
   sportradarWebhook: exports.sportradarWebhook
 };
